@@ -1,285 +1,161 @@
-# The Network Simulator, Version 3
+# NS-3 Simulator: Guia de Instalação e Configuração
 
-[![codecov](https://codecov.io/gh/nsnam/ns-3-dev-git/branch/master/graph/badge.svg)](https://codecov.io/gh/nsnam/ns-3-dev-git/branch/master/)
-[![Gitlab CI](https://gitlab.com/nsnam/ns-3-dev/badges/master/pipeline.svg)](https://gitlab.com/nsnam/ns-3-dev/-/pipelines)
-[![Github CI](https://github.com/nsnam/ns-3-dev-git/actions/workflows/per_commit.yml/badge.svg)](https://github.com/nsnam/ns-3-dev-git/actions)
+## 1. Visão Geral
+O **ns-3** é um simulador de redes de eventos discretos, focado em pesquisa e uso educacional. Este ambiente está configurado para suportar pesquisas em:
+* **Protocolos de Internet:** IPv4/IPv6, TCP/UDP, Roteamento.
+* **Wireless e IoT:** Wi-Fi (até 802.11ax), LTE/5G, LoRaWAN, IEEE 802.15.4 (ZigBee).
+* **Integração com IA:** Interface via memória compartilhada para frameworks de ML.
 
-[![Latest Release](https://gitlab.com/nsnam/ns-3-dev/-/badges/release.svg)](https://gitlab.com/nsnam/ns-3-dev/-/releases)
+**Stack Tecnológico:**
+* **Core:** C++ (Performance e Gerenciamento de Memória).
+* **Bindings:** Python (Scripting rápido e prototipagem).
+* **Build System:** CMake + Ninja (versões ns-3.36+).
+---
 
-## License
+## 2. Configurações da Estação Rádio Base (gNodeB)
+A replicação do modelo de consumo de potência da estação rádio base (BTS), conforme proposto no artigo de referência, foi realizada através de uma arquitetura de simulação distribuída que interliga o Simulador ns-3/5G-LENA.
 
-This software is licensed under the terms of the GNU General Public License v2.0 only (GPL-2.0-only).
-See the LICENSE file for more details.
+A tabela a seguir resume os parâmetros críticos de rádio (RF) e de rede (EPC) utilizados na configuração do gNodeB, conforme o cenário 5G FWA implementado em `fwa-network-sim.cc`.
 
-## Table of Contents
+| Parâmetro | Valor Configurado | Notas |
+| :--- | :--- | :--- |
+| **Padrão** | NR (5G) | Implementação via 5G-LENA. |
+| **Frequência Central** | 3.5 GHz ($3.5 \times 10^9$ Hz) | Banda n77. |
+| **Largura de Banda (BW)** | 40 MHz ($40 \times 10^6$ Hz) | Define a capacidade máxima de dados. |
+| **Numerologia ($\mu$)** | 1 | Corresponde a um *Subcarrier Spacing* (SCS) de 30 kHz. |
+| **Capacidade Máxima** | 270 RBs | Número máximo de Blocos de Recurso (RBs) disponíveis. |
+| **Modelo de Canal** | ThreeGppChannelModel | Modelo de propagação do 3GPP para ambientes de exterior. |
+| **Função (EPC)** | Conectado ao Core P2P | O gNodeB atua como porta de acesso (RAN) ao *Core Network*. |
 
-* [Overview](#overview-an-open-source-project)
-* [Software overview](#software-overview)
-* [Getting ns-3](#getting-ns-3)
-* [Building ns-3](#building-ns-3)
-* [Testing ns-3](#testing-ns-3)
-* [Running ns-3](#running-ns-3)
-* [ns-3 Documentation](#ns-3-documentation)
-* [Working with the Development Version of ns-3](#working-with-the-development-version-of-ns-3)
-* [Contributing to ns-3](#contributing-to-ns-3)
-* [Reporting Issues](#reporting-issues)
-* [Asking Questions](#asking-questions)
-* [ns-3 App Store](#ns-3-app-store)
+## 3. Pré-requisitos do Sistema (Linux/Ubuntu)
 
-> **NOTE**: Much more substantial information about ns-3 can be found at
-<https://www.nsnam.org>
+Antes de iniciar, é necessário instalar as ferramentas de compilação, bibliotecas de desenvolvimento e dependências do Python.
 
-## Overview: An Open Source Project
+```bash
+# Atualizar repositórios
+sudo apt update && sudo apt upgrade -y
 
-ns-3 is a free open source project aiming to build a discrete-event
-network simulator targeted for simulation research and education.
-This is a collaborative project; we hope that
-the missing pieces of the models we have not yet implemented
-will be contributed by the community in an open collaboration
-process. If you would like to contribute to ns-3, please check
-the [Contributing to ns-3](#contributing-to-ns-3) section below.
+# Ferramentas de Build (C++ e CMake)
+sudo apt install -y build-essential cmake ninja-build g++ gcc
 
-This README excerpts some details from a more extensive
-tutorial that is maintained at:
-<https://www.nsnam.org/documentation/latest/>
+# Dependências Python (para bindings e visualização)
+sudo apt install -y python3 python3-dev python3-pip python3-setuptools gir1.2-goocanvas-2.0 python3-gi python3-gi-cairo python3-pygraphviz
 
-## Software overview
+# Ferramentas de Debug e Análise
+sudo apt install -y gdb valgrind tcpdump wireshark
 
-From a software perspective, ns-3 consists of a number of C++
-libraries organized around different topics and technologies.
-Programs that actually run simulations can be written in
-either C++ or Python; the use of Python is enabled by
-[runtime C++/Python bindings](https://cppyy.readthedocs.io/en/latest/).  Simulation programs will
-typically link or import the ns `core` library and any additional
-libraries that they need.  ns-3 requires a modern C++ compiler
-installation (g++ or clang++) and the [CMake](https://cmake.org) build system.
-Most ns-3 programs are single-threaded; there is some limited
-support for parallelization using the [MPI](https://www.nsnam.org/docs/models/html/distributed.html) framework.
-ns-3 can also run in a real-time emulation mode by binding to an
-Ethernet device on the host machine and generating and consuming
-packets on an actual network.  The ns-3 APIs are documented
-using [Doxygen](https://www.doxygen.nl).
-
-The code for the framework and the default models provided
-by ns-3 is built as a set of libraries. The libraries maintained
-by the open source project can be found in the `src` directory.
-Users may extend ns-3 by adding libraries to the build;
-third-party libraries can be found on the [ns-3 App Store](https://www.nsnam.org)
-or elsewhere in public Git repositories, and are usually added to the `contrib` directory.
-
-## Getting ns-3
-
-ns-3 can be obtained by either downloading a released source
-archive, or by cloning the project's
-[Git repository](https://gitlab.com/nsnam/ns-3-dev.git).
-
-Starting with ns-3 release version 3.45, there are two versions
-of source archives that are published with each release:
-
-1. ns-3.##.tar.bz2
-1. ns-allinone-3.##.tar.bz2
-
-The first archive is simply a compressed archive of the same code
-that one can obtain by checking out the release tagged code from
-the ns-3-dev Git repository.  The second archive consists of
-ns-3 plus additional contributed modules that are maintained outside
-of the main ns-3 open source project but that have been reviewed
-by maintainers and lightly tested for compatibility with the
-release.  The contributed modules included in the `allinone` release
-will change over time as new third-party libraries emerge while others
-may lose compatibility with the ns-3 mainline (e.g., if they become
-unmaintained).
-
-## Building ns-3
-
-As mentioned above, ns-3 uses the CMake build system, but
-the project maintains a customized wrapper around CMake
-called the `ns3` tool.  This tool provides a
-[Waf-like](https://waf.io) API
-to the underlying CMake build manager.
-To build the set of default libraries and the example
-programs included in this package, you need to use the
-`ns3` tool. This tool provides a Waf-like API to the
-underlying CMake build manager.
-Detailed information on how to use `ns3` is included in the
-[quick start guide](doc/installation/source/quick-start.rst).
-
-Before building ns-3, you must configure it.
-This step allows the configuration of the build options,
-such as whether to enable the examples, tests and more.
-
-To configure ns-3 with examples and tests enabled,
-run the following command on the ns-3 main directory:
-
-```shell
-./ns3 configure --enable-examples --enable-tests
+# Bibliotecas XML e GSL (GNU Scientific Library - importante para modelos matemáticos de sinal)
+sudo apt install -y libxml2 libxml2-dev libgsl-dev
 ```
 
-Then, build ns-3 by running the following command:
+## 4. Instalação do NS-3
+Recomenda-se o uso do release oficial para estabilidade em trabalhos de mestrado.
 
-```shell
+### 4.1 Download
+Vamos instalar a versão ns-3.40 (ou a mais recente estável).
+
+```bash
+cd ~
+mkdir workspace
+cd workspace
+
+# Download do pacote all-in-one (inclui dependências opcionais como NetAnim)
+wget [https://www.nsnam.org/release/ns-allinone-3.40.tar.bz2](https://www.nsnam.org/release/ns-allinone-3.40.tar.bz2)
+
+# Descompactar
+tar xjf ns-allinone-3.40.tar.bz2
+
+# Entrar no diretório do simulador
+cd ns-allinone-3.40/ns-3.40
+```
+### 4.2 Configuração e Compilação
+O ns-3 utiliza um script wrapper (ns3) que gerencia o CMake.
+
+Configurar o Build: Habilitamos os exemplos e testes para verificar a instalação. O modo debug é ideal para desenvolvimento (permite gdb), enquanto optimized é para coleta de dados finais.
+
+```bash
+./ns3 configure --enable-examples --enable-tests --build-profile=debug
+```
+Compilar (Build): Este passo pode demorar dependendo do processador (15-40 minutos).
+
+## 5.Instalação e Configuração do Módulo 5G-LENA (NR)
+O simulador depende do módulo externo 5G-LENA (nr) para fornecer a funcionalidade 5G. Siga os passos abaixo para garantir que o módulo esteja instalado e que o ambiente ns-3 o reconheça corretamente.
+
+### 5.1 Clonagem do Módulo
+O módulo deve ser clonado dentro da pasta contrib/ do seu repositório ns-3 para ser detectado pelo sistema de build do ns-3.
+```bash
+# Navegue até a pasta contrib/
+cd /ns-3-dev/contrib/
+
+# Clone o repositório 5G-LENA
+git clone https://github.com/5G-LENA/nr.git
+```
+### 5.2 Instalação das Dependências (Pré-requisito)
+O módulo nr requer cabeçalhos de desenvolvimento e bibliotecas externas. Este passo é crucial para evitar o erro Python.h: No such file or directory e garantir que o pybind11 funcione:
+```bash
+# 1. Instalar cabeçalhos de desenvolvimento do Python
+sudo apt update
+sudo apt install python3-dev
+
+# 2. Instalar bibliotecas C++ necessárias (Eigen3 e GSL)
+sudo apt install libeigen3-dev libgsl-dev
+```
+### 5.3 Configuração do Ambiente ns-3
+Após a instalação das dependências, é necessário configurar o ns-3 para reconhecer o novo módulo e as bibliotecas:
+```bash
+# Retorne à pasta raiz do ns-3
+cd /ns-3-dev
+
+# Configurar o ns-3, habilitando os bindings Python e o pybind11
+./ns3 configure --enable-examples --enable-tests --enable-python-bindings -- --with-pybind11
+```
+Verificação: Após a execução do comando configure, certifique-se de que o módulo nr e o python-bindings estejam listados como enabled ou OK na saída do console.
+
+### 5.4 Compilação Completa
+Finalmente, compile todo o projeto para integrar o novo módulo:
+```bash
 ./ns3 build
 ```
+## 6. Verificação da Instalação
+Após a compilação, é crucial validar se os módulos principais (especialmente Wi-Fi, LTE e CSMA) estão funcionais.
 
-By default, the build artifacts will be stored in the `build/` directory.
-
-### Supported Platforms
-
-The current codebase is expected to build and run on the
-set of platforms listed in the [release notes](RELEASE_NOTES.md)
-file.
-
-Other platforms may or may not work: we welcome patches to
-improve the portability of the code to these other platforms.
-
-## Testing ns-3
-
-ns-3 contains test suites to validate the models and detect regressions.
-To run the test suite, run the following command on the ns-3 main directory:
-
-```shell
-./test.py
+```bash
+# Rodar a suite de testes unitários
+./ns3 test
 ```
+Se o output final indicar "PASS", o núcleo do simulador está íntegro.
 
-More information about ns-3 tests is available in the
-[test framework](doc/manual/source/test-framework.rst) section of the manual.
+## 7. Executando sua Primeira Simulação ("Hello World")
+O ns-3 vem com scripts de exemplo na pasta examples/. Vamos rodar um exemplo simples de UDP Echo (cliente-servidor).
 
-## Running ns-3
+Comando:
 
-On recent Linux systems, once you have built ns-3 (with examples
-enabled), it should be easy to run the sample programs with the
-following command, such as:
-
-```shell
-./ns3 run simple-global-routing
+```bash
+./ns3 run first
 ```
+Saída Esperada:
+```bash
+Plaintext
 
-That program should generate a `simple-global-routing.tr` text
-trace file and a set of `simple-global-routing-xx-xx.pcap` binary
-PCAP trace files, which can be read by `tcpdump -n -tt -r filename.pcap`.
-The program source can be found in the `examples/routing` directory.
-
-## Running ns-3 from Python
-
-If you do not plan to modify ns-3 upstream modules, you can get
-a pre-built version of the ns-3 python bindings. It is recommended
-to create a python virtual environment to isolate different application
-packages from system-wide packages (installable via the OS package managers).
-
-```shell
-python3 -m venv ns3env
-source ./ns3env/bin/activate
-pip install ns3
+At time 2s client sent 1024 bytes to 10.1.1.2 Port 9
+At time 2.00369s server received 1024 bytes from 10.1.1.1 Port 49153
+At time 2.00369s server sent 1024 bytes to 10.1.1.1 Port 49153
+At time 2.00737s client received 1024 bytes from 10.1.1.2 Port 9
 ```
+Interpretação: O cliente enviou um pacote aos 2 segundos. Devido à latência simulada do canal, o servidor recebeu 3.69ms depois.
 
-If you do not have `pip`, check their documents
-on [how to install it](https://pip.pypa.io/en/stable/installation/).
+## 8. Estrutura de Diretórios para Desenvolvimento
+Para manter o projeto organizado, evite editar arquivos dentro de examples/. Crie seus scripts na pasta scratch/. O compilador detecta automaticamente arquivos .cc nesta pasta.
 
-After installing the `ns3` package, you can then create your simulation python script.
-Below is a trivial demo script to get you started.
+* src/: Código fonte dos módulos (Wi-Fi, LTE, Internet).
 
-```python
-from ns import ns
+* build/: Binários e bibliotecas compiladas.
 
-ns.LogComponentEnable("Simulator", ns.LOG_LEVEL_ALL)
+* scratch/: Seu laboratório. Coloque seus experimentos aqui.
 
-ns.Simulator.Stop(ns.Seconds(10))
-ns.Simulator.Run()
-ns.Simulator.Destroy()
+Exemplo: scratch/meu-experimento-iot.cc
+
+Executar:
+```bash
+./ns3 run meu-experimento-iot
 ```
-
-The simulation will take a while to start, while the bindings are loaded.
-The script above will print the logging messages for the called commands.
-
-Use `help(ns)` to check the prototypes for all functions defined in the
-ns3 namespace. To get more useful results, query specific classes of
-interest and their functions e.g., `help(ns.Simulator)`.
-
-Smart pointers `Ptr<>` can be differentiated from objects by checking if
-`__deref__` is listed in `dir(variable)`. To dereference the pointer,
-use `variable.__deref__()`.
-
-Most ns-3 simulations are written in C++ and the documentation is
-oriented towards C++ users. The ns-3 tutorial programs (`first.cc`,
-`second.cc`, etc.) have Python equivalents, if you are looking for
-some initial guidance on how to use the Python API. The Python
-API may not be as full-featured as the C++ API, and an API guide
-for what C++ APIs are supported or not from Python do not currently exist.
-The project is looking for additional Python maintainers to improve
-the support for future Python users.
-
-## ns-3 Documentation
-
-Once you have verified that your build of ns-3 works by running
-the `simple-global-routing` example as outlined in the [running ns-3](#running-ns-3)
-section, it is quite likely that you will want to get started on reading
-some ns-3 documentation.
-
-All of that documentation should always be available from
-the ns-3 website: <https://www.nsnam.org/documentation/>.
-
-This documentation includes:
-
-* a tutorial
-* a reference manual
-* models in the ns-3 model library
-* a wiki for user-contributed tips: <https://www.nsnam.org/wiki/>
-* API documentation generated using doxygen: this is
-  a reference manual, most likely not very well suited
-  as introductory text:
-  <https://www.nsnam.org/doxygen/index.html>
-
-## Working with the Development Version of ns-3
-
-If you want to download and use the development version of ns-3, you
-need to use the tool `git`. A quick and dirty cheat sheet is included
-in the manual, but reading through the Git
-tutorials found in the Internet is usually a good idea if you are not
-familiar with it.
-
-If you have successfully installed Git, you can get
-a copy of the development version with the following command:
-
-```shell
-git clone https://gitlab.com/nsnam/ns-3-dev.git
-```
-
-However, we recommend to follow the GitLab guidelines for starters,
-that includes creating a GitLab account, forking the ns-3-dev project
-under the new account's name, and then cloning the forked repository.
-You can find more information in the [manual](https://www.nsnam.org/docs/manual/html/working-with-git.html).
-
-## Contributing to ns-3
-
-The process of contributing to the ns-3 project varies with
-the people involved, the amount of time they can invest
-and the type of model they want to work on, but the current
-process that the project tries to follow is described in the
-[contributing code](https://www.nsnam.org/developers/contributing-code/)
-website and in the [CONTRIBUTING.md](CONTRIBUTING.md) file.
-
-## Reporting Issues
-
-If you would like to report an issue, you can open a new issue in the
-[GitLab issue tracker](https://gitlab.com/nsnam/ns-3-dev/-/issues).
-Before creating a new issue, please check if the problem that you are facing
-was already reported and contribute to the discussion, if necessary.
-
-## Asking Questions
-
-ns-3 has an official [ns-3-users message board](https://groups.google.com/g/ns-3-users)
-where the community asks questions and share helpful advice.
-Additionally, ns-3 has the [ns-3 Zulip chat](https://ns-3.zulipchat.com/), used to discuss
-development issues and questions among maintainers and the community.
-
-Please use the above resources to ask questions about ns-3, rather than creating issues.
-
-## ns-3 App Store
-
-The official [ns-3 App Store](https://apps.nsnam.org/) is a centralized directory
-listing third-party modules for ns-3 available on the Internet.
-
-More information on how to submit an ns-3 module to the ns-3 App Store is available
-in the [ns-3 App Store documentation](https://www.nsnam.org/docs/contributing/html/external.html).
-# 5GLENA_NS3Unicamp
-# 5GLENA_NS3Unicamp
